@@ -1,0 +1,41 @@
+# Define provider
+provider "aws" {
+  region = "us-east-1"
+}
+
+
+resource "aws_key_pair" "example" {
+  key_name   = "mykeypair"
+  public_key = file("mykeypair.pub")
+}
+
+resource "aws_instance" "this" {
+  ami           = "ami-0557a15b87f6559cf"
+  instance_type = "t2.micro"
+  count         = 1
+  key_name      = aws_key_pair.example.key_name
+  provisioner "local-exec" {
+    command = "echo ${self.private_ip} >> private_ips.txt"
+  }
+  provisioner "remote-exec" {
+    inline = [
+      "echo ${self.private_ip} >> /home/private_ips.txt"
+    ]
+    connection {
+      type        = "ssh"
+      user        = "ubuntu"
+      private_key = file("mykeypair")
+      host        = self.public_ip
+      host_key    = true
+    }
+  }
+  
+  tags = {
+    Name = "myec2"
+  }
+}
+output "instance_ip_addr" {
+  value       = aws_instance.this[0].private_ip
+  description = "The private IP address of the main server instance."
+}
+
